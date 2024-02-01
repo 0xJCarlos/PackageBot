@@ -30,8 +30,10 @@ def create_tracking(track_code):
         "X-RapidAPI-Key": RapidAPIKey,
         "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
-    time.sleep(2) 
+    time.sleep(1) 
     response = requests.post(url, data=payload, headers=headers)
+    time.sleep(1) 
+
 
     if response.status_code == 200:
         package_id = response.json().get('pkgId')
@@ -52,8 +54,10 @@ def get_package_updates(package_id):
         "X-RapidAPI-Key": RapidAPIKey,
         "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
-    time.sleep(2) 
+    time.sleep(1) 
     response = requests.get(url, headers=headers, params=querystring)
+    time.sleep(1) 
+
 
     if response.status_code == 200:
         package_data = response.json().get('pkg')
@@ -72,7 +76,7 @@ def send_welcome(message):
 
 @bot.message_handler(func=lambda msg: True)
 def handle_tracking_request(message):
-    track_code = message.text.strip()
+    track_code = str(message.text.strip())
     print(track_code)
 
     if track_code in tracking_updates:

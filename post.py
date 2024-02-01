@@ -36,21 +36,7 @@ def getTrack(packageId):
     }
     response = requests.get(url, headers=headers, params=querystring)
     data = response.json()
-
-    # Initialize an empty dictionary to store the events
-    events_dict = {}
-
-    # Loop over all events
-    i = 0
-    for event in data['pkg']['events']:
-        # Use the event's id as the key and a dictionary of "dt" and "dsc" as the value
-        #events_dict[event['id']] = {'dt': event['dt'], 'dsc': event['dsc']}
-        events_dict['event_id'] = i
-        events_dict['dt'] = event['dt']
-        events_dict['dsc'] = event['dsc']
-        i += 1
-
-    return events_dict
+    return data
 
 
 
