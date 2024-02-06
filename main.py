@@ -2,6 +2,7 @@ import os
 import telebot
 import requests
 import time
+import json
 
 from dotenv import load_dotenv
 
@@ -24,26 +25,27 @@ def create_tracking(track_code):
 
     payload = {"trackCode": track_code}
     headers = {
-        "content-type": "application/x-www-form-urlencoded",
-        "Accept": "application/json; charset=UTF-8",
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-RapidAPI-Key": RapidAPIKey,
-        "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
+	"content-type": "application/x-www-form-urlencoded",
+	"Accept": "application/json; charset=UTF-8",
+	"Content-Type": "application/x-www-form-urlencoded",
+	"X-RapidAPI-Key": RapidAPIKey,
+	"X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
     time.sleep(1) 
     response = requests.post(url, data=payload, headers=headers)
+    print("Status code: " + str(response.status_code))
     time.sleep(1) 
 
 
-    if response.status_code == 200:
-        package_id = response.json().get('pkgId')
+    if response.status_code >= 200 and response.status_code < 300:
+        package_id = str(response.json().get('pkgId'))
         print("ID del paquete retornado por la función create_tracking : " + package_id)
         return package_id
+    elif (response.status_code == 429):
+        print("Se alcanzó el limite diario de solicitudes a la API de Postal Ninja.")
     else:
         print("Hubo un error al crear el ID del paquete.")
         print("Status de la Respuesta de la API de Postal Ninja: " + str(response.status_code))
-        if (response.status_code == 429):
-            print("Se alcanzó el limite diario de solicitudes a la API de Postal Ninja.")
         return None
 
 def get_package_updates(package_id):
@@ -59,11 +61,11 @@ def get_package_updates(package_id):
     time.sleep(1) 
 
 
-    if response.status_code == 200:
+    if response.status_code >= 200 and response.status_code < 300:
         package_data = response.json().get('pkg')
         events = package_data.get('events', [])
         latest_update = f"{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No updates available"
-        print(latest_update)
+        print(str(latest_update))
         return latest_update
     else:
         print("Hubo un error de conexión a la API de Postal Ninja")
@@ -84,9 +86,11 @@ def handle_tracking_request(message):
         bot.reply_to(message, f"El paquete ya está siendo rastreado. Última actualización: {latest_update}")
         print(f"El paquete ya está siendo rastreado. Última actualización: {latest_update}")
     else:
+        time.sleep(1)
         package_id = create_tracking(track_code)
 
         if package_id:
+            time.sleep(1)
             latest_update = get_package_updates(package_id)
 
             if latest_update:

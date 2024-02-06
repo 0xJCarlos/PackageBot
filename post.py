@@ -35,9 +35,15 @@ def getTrack(packageId):
         "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
     response = requests.get(url, headers=headers, params=querystring)
+    print("Status code: " + str(response.status_code))
     data = response.json()
     return data
 
 
+x = getTrack(53728539)
+print(x)
+
+
+#53728539
 
 
