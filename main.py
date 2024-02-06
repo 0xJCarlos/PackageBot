@@ -1,4 +1,4 @@
-import os 
+import os
 import telebot
 import requests
 import time
@@ -6,7 +6,7 @@ import json
 
 from dotenv import load_dotenv
 
-load_dotenv() 
+load_dotenv()
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 RapidAPIKey = os.environ.get('X-RapidAPI-Key')
 
@@ -18,37 +18,66 @@ print("Bot started...")
 
 # Dictionary to store latest updates for each tracking number
 tracking_updates = {}
+# Dictionary to store tracking numbers and their corresponding package IDs
+packages = {}
 
-def create_tracking(track_code):
+def create_tracking(message):
+    # Ask user for the tracking code
+    bot.reply_to(message, "Por favor, introduce el código de seguimiento del paquete:")
+    # Set a state to indicate that we are waiting for the tracking code
+    bot.register_next_step_handler(message, process_tracking_code)
+
+def process_tracking_code(message):
+    track_code = message.text.strip()
     print("Código de seguimiento recibido: " + track_code)
     url = "https://postal-ninja.p.rapidapi.com/v1/track"
 
     payload = {"trackCode": track_code}
     headers = {
-	"content-type": "application/x-www-form-urlencoded",
-	"Accept": "application/json; charset=UTF-8",
-	"Content-Type": "application/x-www-form-urlencoded",
-	"X-RapidAPI-Key": RapidAPIKey,
-	"X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
+        "content-type": "application/x-www-form-urlencoded",
+        "Accept": "application/json; charset=UTF-8",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-RapidAPI-Key": RapidAPIKey,
+        "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
-    time.sleep(1) 
+    time.sleep(1)
     response = requests.post(url, data=payload, headers=headers)
     print("Status code: " + str(response.status_code))
-    time.sleep(1) 
-
+    time.sleep(1)
 
     if response.status_code >= 200 and response.status_code < 300:
         package_id = str(response.json().get('pkgId'))
         print("ID del paquete retornado por la función create_tracking : " + package_id)
-        return package_id
+        # Store the tracking number and package ID in the packages dictionary
+        packages[track_code] = package_id
+        # Return the package ID
+        bot.reply_to(message, f"Paquete añadido al seguimiento con ID: {package_id}")
+        print(f"Paquete añadido al seguimiento con ID: {package_id}")
     elif (response.status_code == 429):
-        print("Se alcanzó el limite diario de solicitudes a la API de Postal Ninja.")
+        bot.reply_to(message, "Se alcanzó el límite diario de solicitudes a la API de Postal Ninja.")
     else:
-        print("Hubo un error al crear el ID del paquete.")
-        print("Status de la Respuesta de la API de Postal Ninja: " + str(response.status_code))
-        return None
+        bot.reply_to(message, "Hubo un error al crear el ID del paquete.")
+        bot.reply_to(message, "Status de la Respuesta de la API de Postal Ninja: " + str(response.status_code))
 
-def get_package_updates(package_id):
+def get_package_updates(message):
+    # Display list of tracking numbers to choose from
+    options = "\n".join([f"{index + 1}. {track_code}" for index, track_code in enumerate(reversed(packages.keys()))])
+    bot.reply_to(message, f"Selecciona el número de seguimiento:\n{options}")
+    # Set a state to indicate that we are waiting for the user to select a tracking number
+    bot.register_next_step_handler(message, process_tracking_selection)
+
+def process_tracking_selection(message):
+    try:
+        selection_index = int(message.text.strip()) - 1
+        selected_track_code = list(reversed(packages.keys()))[selection_index]
+        package_id = packages[selected_track_code]
+        latest_update = fetch_package_updates(package_id)
+        bot.reply_to(message, f"Última actualización para el paquete {selected_track_code}: {latest_update}")
+    except Exception as e:
+        bot.reply_to(message, "Opción inválida. Por favor, selecciona un número válido.")
+        print("Error:", e)
+
+def fetch_package_updates(package_id):
     url = f"https://postal-ninja.p.rapidapi.com/v1/track/{package_id}"
     querystring = {"await": "false", "lang": "AS_IS"}
     headers = {
@@ -56,15 +85,14 @@ def get_package_updates(package_id):
         "X-RapidAPI-Key": RapidAPIKey,
         "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
-    time.sleep(1) 
+    time.sleep(1)
     response = requests.get(url, headers=headers, params=querystring)
-    time.sleep(1) 
-
+    time.sleep(1)
 
     if response.status_code >= 200 and response.status_code < 300:
         package_data = response.json().get('pkg')
         events = package_data.get('events', [])
-        latest_update = f"{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No updates available"
+        latest_update = f"{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No hay actualizaciones disponibles"
         print(str(latest_update))
         return latest_update
     else:
@@ -76,44 +104,12 @@ def send_welcome(message):
     print("Message received: " + str(message.text.strip()))
     bot.reply_to(message, "Buenas, ¿Cómo andamos?")
 
-@bot.message_handler(func=lambda msg: True)
-def handle_tracking_request(message):
-    track_code = str(message.text.strip())
-    print(track_code)
+@bot.message_handler(commands=['start_tracking'])
+def start_tracking(message):
+    create_tracking(message)
 
-    if track_code in tracking_updates:
-        latest_update = tracking_updates[track_code]
-        bot.reply_to(message, f"El paquete ya está siendo rastreado. Última actualización: {latest_update}")
-        print(f"El paquete ya está siendo rastreado. Última actualización: {latest_update}")
-    else:
-        time.sleep(1)
-        package_id = create_tracking(track_code)
-
-        if package_id:
-            time.sleep(1)
-            latest_update = get_package_updates(package_id)
-
-            if latest_update:
-                tracking_updates[track_code] = latest_update
-                bot.reply_to(message, f"Paquete rastreado. Última actualización: {latest_update}")
-                print(f"Paquete rastreado. Última actualización: {latest_update}")
-            else:
-                bot.reply_to(message, "No se pudo obtener la información del paquete en este momento.")
-                print("No se pudo obtener la información del paquete en este momento.")
-        else:
-            bot.reply_to(message, "Hubo un error, revisa tu número de paquete o revisa la consola.")
-            print("Hubo un error, revisa tu número de paquete o revisa la consola..")
-
-@bot.message_handler(commands=['latest'])
-def handle_latest_update_request(message):
-    track_code = message.text.strip().split()[1] if len(message.text.strip().split()) > 1 else None
-
-    if track_code in tracking_updates:
-        latest_update = tracking_updates[track_code]
-        bot.reply_to(message, f"Última actualización para el paquete {track_code}: {latest_update}")
-        print(f"Última actualización para el paquete {track_code}: {latest_update}")
-    else:
-        bot.reply_to(message, "No se encontraron actualizaciones para este paquete.")
-        print("No se encontraron actualizaciones para este paquete.")
+@bot.message_handler(commands=['see_updates'])
+def see_updates(message):
+    get_package_updates(message)
 
 bot.infinity_polling()
