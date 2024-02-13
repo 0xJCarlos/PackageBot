@@ -21,6 +21,7 @@ tracking_updates = {}
 # Dictionary to store tracking numbers and their corresponding package IDs
 packages = {}
 
+
 def create_tracking(message):
     # Ask user for the tracking code
     bot.reply_to(message, "Por favor, introduce el código de seguimiento del paquete:")
@@ -40,7 +41,6 @@ def process_tracking_code(message):
         "X-RapidAPI-Key": RapidAPIKey,
         "X-RapidAPI-Host": "postal-ninja.p.rapidapi.com"
     }
-    time.sleep(1)
     response = requests.post(url, data=payload, headers=headers)
     print("Status code: " + str(response.status_code))
     time.sleep(1)
@@ -87,12 +87,11 @@ def fetch_package_updates(package_id):
     }
     time.sleep(1)
     response = requests.get(url, headers=headers, params=querystring)
-    time.sleep(1)
 
     if response.status_code >= 200 and response.status_code < 300:
         package_data = response.json().get('pkg')
         events = package_data.get('events', [])
-        latest_update = f"{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No hay actualizaciones disponibles"
+        latest_update = f"{events[-2].get('dt')}: {events[-2].get('dsc')}\n{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No hay actualizaciones disponibles"
         print(str(latest_update))
         return latest_update
     else:
