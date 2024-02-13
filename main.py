@@ -91,7 +91,10 @@ def fetch_package_updates(package_id):
     if response.status_code >= 200 and response.status_code < 300:
         package_data = response.json().get('pkg')
         events = package_data.get('events', [])
-        latest_update = f"{events[-2].get('dt')}: {events[-2].get('dsc')}\n{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No hay actualizaciones disponibles"
+        if "Package delivered" in events[-1].get('dsc'):
+            latest_update = f"{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No hay actualizaciones disponibles"
+        else:
+            latest_update = f"{events[-2].get('dt')}: {events[-2].get('dsc')}\n{events[-1].get('dt')}: {events[-1].get('dsc')}" if events else "No hay actualizaciones disponibles"
         print(str(latest_update))
         return latest_update
     else:
